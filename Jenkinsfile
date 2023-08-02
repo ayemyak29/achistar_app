@@ -1,38 +1,28 @@
-#!groovy
-def tag="latest"
-def dockerHubUser="ayemyak"
-def httpPort="9080"
-
 node {
-  stages {
-  	stage('Checkout') {
-	   checkout scm
-      }
-        stage('Build') {
-      	   sh 'mvn clean install'
-    }
-	stage('Image Prune') {
-	   sh "docker image prune -f"
-   }
-	stage('Image Build') {
-	   sh "docker build -t $containerName:$tag -t $containerName --pull --no--cache ."
-	   echo "Image build complete"
-  }
-	stage('Push to Docker Registry') {
-	   withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'dockerUser', passwordVariable: 'dockerPassword')])
-	 {
-	   sh "docker login -u $dockerUser -p $dockerPassword"
-	   sh "docker tag $containerName:$tag $dockerUser/$containerName:$tag"
-	   sh "docker push $dockerUser/$containerName:$tag"
-  	   echo "Image push complete"
+	def application = "springbootapp"
+	def dockerhubaccountid = "ayemyak"
+	stage('Clone repository') {
+		checkout scm
 	}
-  }
-	stage('Run App') {
-	   sh "docker rm $containerName -f"
-	   sh "docker $dockerHubUser/$containerName"
-   	   sh "docker run -d --rm -p $httpPort:$httpPort --name $containerName $dockerHubUser/$containerName:$tag"
-	   echo "Application started on port: ${httpPort} (http)"
- }
 
+	stage('Build image') {
+		app = docker.build("${dockerhubaccountid}/${application}:${BUILD_NUMBER}")
+	}
+
+	stage('Push image') {
+		withDockerRegistry([ credentialsId: "dockerHub", url: "" ]) {
+		app.push()
+		app.push("latest")
+	}
+	}
+
+	stage('Deploy') {
+		sh ("docker run -d -p 81:8080 -v /var/log/:/var/log/ ${dockerhubaccountid}/${application}:${BUILD_NUMBER}")
+	}
+	
+	stage('Remove old images') {
+		// remove docker pld images
+		sh("docker rmi ${dockerhubaccountid}/${application}:latest -f")
+   }
 }
-}
+
