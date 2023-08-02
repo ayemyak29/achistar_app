@@ -6,7 +6,7 @@ def httpPort="9080"
 node {
   stages {
   	stage('Checkout') {
-	   Checkout scm
+	   checkout scm
       }
         stage('Build') {
       	   sh 'mvn clean install'
